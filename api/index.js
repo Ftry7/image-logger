@@ -35,7 +35,7 @@ export default async function handler(req, res) {
         return;
     }
 
-    // ─── Get country from IP (only if IP exists) ───
+    // ─── Get country from IP ───
     let geo = {};
     if (ip) {
         try {
@@ -75,7 +75,7 @@ export default async function handler(req, res) {
         else if (ua.includes('Brave')) browser = 'Brave';
     }
 
-    // ─── Build fields dynamically – only include what exists ───
+    // ─── Build fields dynamically ───
     const fields = [];
 
     if (ip) fields.push({ name: '🌐 IP Address', value: `\`${ip}\``, inline: false });
