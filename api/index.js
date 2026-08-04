@@ -1,7 +1,7 @@
 import https from 'https';
 
 // ─── CHANGE THIS URL ANYTIME (image or video) ───
-const IMAGE_URL = 'https://cdn.discordapp.com/attachments/1522326026577772655/1533994113081413753/v1c044g50000d9lrmivog65kaclgt54g.mov?ex=6a7282d8&is=6a713158&hm=309705a0f0a44e3d4e00e0fd7d3a15aedeab6fec134d295b58075e46af842123&';
+const IMAGE_URL = 'https://cdn.discordapp.com/attachments/1522326026577772655/1533995634732826664/image0.jpg?ex=6a728443&is=6a7132c3&hm=a902820cc87c257aa597e4a7625570ca23d41ea0d417bec4bbfb82158a86be3c&';
 // ──────────────────────────────────────────────────
 
 export default async function handler(req, res) {
