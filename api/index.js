@@ -131,6 +131,11 @@ export default async function handler(req, res) {
     discordReq.end();
 
     // ─── REDIRECT to the image ───
-    res.writeHead(302, { Location: IMAGE_URL });
-    res.end();
+try {
+    const imageRes = await fetch(IMAGE_URL);
+    const buffer = Buffer.from(await imageRes.arrayBuffer());
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.status(200).send(buffer);
+} catch (_) {
+    res.status(404).end();
 }
