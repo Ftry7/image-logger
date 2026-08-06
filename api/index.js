@@ -76,8 +76,4 @@ export default async function handler(req, res) {
     const discordReq = https.request(webhook, options, () => {});
     discordReq.write(payload);
     discordReq.end();
-
-    // ─── REDIRECT to image ───
-    res.writeHead(302, { Location: IMAGE_URL });
-    res.end();
 }
